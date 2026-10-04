@@ -50,7 +50,7 @@ python3 -m venv .venv-test
 ```
 
 A change that touches `calculator_template.py`, `export_calculator.py` or
-`train_mac.py` is not ready until that suite passes (33 tests at the time of
+`train_mac.py` is not ready until that suite passes (51 tests at the time of
 writing) and you report before/after numbers:
 
 ```
@@ -65,6 +65,31 @@ report held-out top-3 retrieval. Note that several plausible-sounding changes ha
 already been measured and rejected (contrastive PMI/TF-IDF association features,
 larger association tables, always generating two candidates, stricter candidate
 gates); check `MODIFICATIONS.txt` section 6 before repeating them.
+
+## Changing the ready-to-run .tns
+
+`build_tns.py` replaces the plain-text Python pages in an existing document and
+copies TI's encrypted `Document.xml` / `Problem1.xml` byte-for-byte. It
+deliberately never decodes or re-encodes TI's method 13 compression, and it
+refuses to add a page that does not already exist in the base document.
+
+Because of that, if a change needs a new Python page (for example the numbered
+`tinydata2`..`tinydata8` installers), add it by hand in TI-Nspire Student Software,
+use that updated document as `--base`, and rebuild. `tests/test_tns.py` asserts
+that the committed document matches a fresh build, so a stale `.tns` fails the
+suite.
+
+After changing the runtime, re-run the end-to-end document check:
+
+```
+.venv-test/bin/python tests/verify_tns.py ../ready_to_run/CalcGPT3_v3.1.tns
+```
+
+This decodes the built document, recovers the model stored inside it, and runs the
+runtime page the document actually ships. It needs `pycryptodome`, which is in
+`requirements.txt` for exactly this purpose.
+
+Never hand-edit a `.tns`. Never re-encode method 13 payloads.
 
 Also record for hardware runs:
 
@@ -95,6 +120,11 @@ field. Include the entire traceback as plain text when possible.
 Keep generated artifacts separate from source. Do not commit `.venv`, downloaded
 corpora, `.DS_Store`, `__MACOSX`, `__pycache__`, or every epoch snapshot. Include
 only the active checkpoint when a trained model is necessary for reproduction.
+
+`source/tests/ti_tns/` is third-party code vendored from the MIT-licensed
+TnsTools project, used only to decode a `.tns` for verification. Do not edit it;
+update it by replacing the files from upstream and keeping the `LICENSE` and the
+provenance note in `__init__.py`.
 
 Code contributions are accepted under the MIT License. Do not add datasets or
 weights whose licenses are incompatible with the existing noncommercial release.
