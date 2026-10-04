@@ -1,0 +1,98 @@
+CALCGPT 3 IMPROVEMENT ROADMAP
+=============================
+
+Status as of version 3.1. "Done" means implemented and measured in 3.1.
+"Open" means still unresolved. See MODIFICATIONS.txt for evidence.
+
+COMPLETED IN 3.1
+================
+
+1. [DONE] Fixed held-out evaluation suite and response-relevance measurements.
+   source/tests/run_suite.py holds a fixed 14-prompt suite; quality_metrics.py
+   scores composite, relevance, repetition, OOV, complete rate and dangling rate.
+   evaluate.py records before/after runs in source/tests/results/.
+
+2. [DONE] Better repetition and incomplete-sentence handling.
+   Exact three-token repetition suppression, a running frequency penalty, and an
+   absolute quality gate that only spends a second candidate when the first fails.
+   Dangling rate 0.000 and complete rate 1.000 on the suite.
+
+3. [DONE] Condition on prior turns without exceeding calculator memory.
+   understand(prompt_ids, context_ids) with a weighted, bounded rolling context
+   (CONTEXT_WEIGHT 0.5, CONTEXT_LIMIT 16, PROMPT_LIMIT 18).
+
+4. [DONE] Deterministic seeds and repeatable calculator benchmarks.
+   --seed on the trainer, a seeded harness, and before/after JSON recordings.
+
+5. [DONE] Faster matrix operations.
+   Inlined packed-byte decode and cached bias vectors: about 2x per generated
+   token, verified numerically identical to the original implementation.
+
+6. [DONE] Smaller export encoding and installer improvements.
+   Per-unit Adler-32 checksums verified at decode time, read-back length checks,
+   a full weight re-verify in the final part, idempotent and resumable numbered
+   parts, different-model-id confirmation, and model_meta.json.
+
+7. [DONE] Compact export encoding and better paste workflow, partly.
+   Exports are split into numbered paste-safe parts of about 11 KB each and a
+   corrupt paste now names the failing unit instead of failing opaquely.
+
+8. [DONE] Regression tests.
+   33 unit tests covering quantization, the exporter, the installer, tensor and
+   vocabulary reconstruction, decoder edge cases, context and the controls.
+   All pass.
+
+STILL OPEN
+==========
+
+HIGH PRIORITY
+
+A1. The core limitation: no reliable semantic understanding. This is unchanged.
+    3.1 improved the decoder and speed, not comprehension.
+
+A2. Train a compact semantic candidate ranker using positive and mismatched
+    replies. Not attempted in 3.1; still the most promising direction.
+
+A3. Distill response behavior from a stronger teacher into calculator-sized
+    states. Not attempted.
+
+A4. Add an optional diagnostics page showing timing, memory stage and model id.
+    The harness records timings on the desktop, but no on-device view exists.
+
+MEDIUM PRIORITY
+
+B1. Compare word, subword and byte tokenization at equal exported model size.
+
+B2. Quantize scales and metadata more compactly while measuring quality loss.
+
+B3. Cache or stream model chunks to shorten first-response loading. The 3.1
+    loader caches dequantized biases but still reads all chunks on first use.
+
+B4. Test key events on physical and preview environments across current TI OSes.
+    The new Ctrl+N/R/T/L keys are unverified on hardware.
+
+RESEARCH QUESTIONS (all still open)
+
+- Can a small dual encoder improve prompt relevance more than extra GRU capacity?
+- Can teacher-generated, safety-filtered dialogue pairs outperform more epochs on
+  DailyDialog without becoming memorized canned answers?
+- What is the best quality/latency point below the TI Python memory ceiling?
+- Can a smaller vocabulary free enough memory for a more useful hidden state?
+- Can response ranking be performed incrementally during generation?
+
+ALREADY TESTED AND REJECTED (do not re-try unchanged)
+
+- Contrastive PMI/TF-IDF association features. Top-3 retrieval 0.393 -> 0.112.
+- Larger count-based association tables (up to 4,096 bigram features).
+  0.393 -> 0.403 for about 4x the memory.
+- Always generating two candidates. Slower and worse than the adaptive gate.
+- Stricter candidate gates (content 4, distinct 3, repetition 35-45 percent).
+  Worse than the shipped thresholds.
+
+CHANGES THAT ARE UNLIKELY TO SOLVE THE CORE PROBLEM ALONE
+
+- Training the current architecture for many more epochs
+- Increasing temperature or reply length
+- Adding more phrase matchers
+- Showing higher classifier confidence
+- Hiding failures with hardcoded conversational responses

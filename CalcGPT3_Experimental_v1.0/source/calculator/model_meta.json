@@ -1,0 +1,21 @@
+{
+  "format": 13,
+  "build": 2,
+  "model_id": 1282619148,
+  "epochs": 40,
+  "vocab": 640,
+  "embedding": 20,
+  "hidden": 30,
+  "installer_parts": 8,
+  "tensor_checksums": [
+    3253446299,
+    935094154,
+    117706556,
+    3996790513,
+    1287334918,
+    72505880,
+    3101615120
+  ],
+  "vocab_chunks": 5,
+  "assoc_chunks": 17
+}

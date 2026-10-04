@@ -1,0 +1,7 @@
+torch>=2.6
+numpy>=2.0
+
+# Only needed to verify a built ready-to-run .tns (tests/verify_tns.py and
+# tests/test_tns.py), which decodes TI-Nspire's method 13 document XML. The
+# calculator runtime itself, the trainer and the exporter do not need it.
+pycryptodome>=3.20

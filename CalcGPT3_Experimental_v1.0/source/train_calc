@@ -1,0 +1,27 @@
+#!/bin/zsh
+set -e
+ROOT="${0:A:h}"
+cd "$ROOT"
+
+if [[ ! -d .venv ]]; then
+  echo "Creating the TinyLM Mac training environment..."
+  /usr/bin/env python3 -m venv .venv
+  source .venv/bin/activate
+  python3 -m pip install --upgrade pip
+  python3 -m pip install -r requirements.txt
+else
+  source .venv/bin/activate
+fi
+
+read "epochs?How many additional training epochs? [20]: "
+epochs="${epochs:-20}"
+if [[ ! "$epochs" == <-> ]] || (( epochs < 1 || epochs > 100 )); then
+  echo "Please enter a whole number from 1 through 100."
+  exit 2
+fi
+
+python3 train_mac.py --epochs "$epochs"
+echo
+echo "Updated calculator files:"
+echo "  $ROOT/calculator/tinylm.py"
+for file in "$ROOT"/calculator/tinydata*.py; do echo "  $file"; done

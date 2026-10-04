@@ -1,0 +1,155 @@
+CALCGPT 3 KNOWN ISSUES - VERSION 3.1
+====================================
+
+Version 3.1 improved speed, the decoder, the installer and the tooling. It did
+not change the model weights, so the core limitation is unchanged. Items marked
+"partially addressed" were improved but not solved. See MODIFICATIONS.txt for the
+measurements behind each claim.
+
+1. NO RELIABLE SEMANTIC UNDERSTANDING (UNCHANGED)
+
+The model frequently generates locally plausible English without correctly
+responding to the prompt. Examples include irrelevant agreement, apologies,
+unfinished comparisons, and repeated phrases such as "good idea" or "not sure."
+This is the principal research limitation, not a minor user-interface bug. The 3.1
+decoder suppresses repeated trigrams and avoids wasting a second candidate, which
+makes replies read better without making them more relevant.
+
+2. TRAINING LOSS IS NOT RESPONSE QUALITY (UNCHANGED)
+
+Training loss decreased substantially through E40, but real conversations still
+show poor meaning and relevance. More epochs may reinforce corpus phrases or cause
+overfitting. Evaluate on a held-out prompt suite after every architectural change.
+The 3.1 trainer adds a validation split (default 5 percent) and reports
+validation loss, but a validation loss curve is not a quality measure either.
+
+3. CLASSIFIER CONFIDENCE IS NOT ACCURACY (UNCHANGED)
+
+Header values such as IN87% describe separation within the dialogue-act/emotion
+classifier. They do not mean that the response is 87% correct or relevant.
+
+4. REPETITION AND JARGON (IMPROVED, NOT SOLVED)
+
+High-frequency tokens and short conversational phrases can still dominate a
+sampled candidate. Version 3.1 adds exact three-token repetition suppression and a
+running frequency penalty, which lowered the suite's repetition metric from 0.202
+to 0.189. The ranker still does not possess a trained semantic relevance model, so
+a fluent but irrelevant reply can still win.
+
+5. PARTIAL FOLLOW-UP CONTEXT
+
+Version 3.1 adds a bounded rolling context (CONTEXT_WEIGHT 0.5, CONTEXT_LIMIT 16,
+PROMPT_LIMIT 18), so short follow-ups such as "what about you" resolve their
+content words against the previous turn instead of in isolation. This is a
+weighted bag-of-content-words, not a dialogue model. References to the previous
+response, requests to explain itself, quotations, corrections and topic shifts are
+still handled unreliably, and the window is deliberately short to protect
+calculator memory.
+
+6. STARTUP AND RESPONSE LATENCY (PARTIALLY ADDRESSED)
+
+Version 1.0 measured approximately 40 seconds to launch, 30 seconds to load the
+model for the first response, and 20 seconds to generate and rank a reply. Version
+3.1 cuts the per-response CPU work by about 2x (desktop harness: 233.1 -> 118.8 ms
+per generated reply; step 2.10x, logits 2.00x, choose 1.24x), and the adaptive
+candidate gate avoids generating a second reply in most cases. Expect a
+noticeable improvement on the same hardware, but treat the absolute seconds as
+unmeasured: no TI-Nspire hardware was available to re-run the timings. Launch and
+first-load times are essentially unchanged. Exiting the program still discards
+Python's loaded model, so the next run must load it again.
+
+7. MEMORY LIMITS
+
+Increasing hidden width or vocabulary can cause MemoryError on the calculator.
+Packed weights must remain chunked. Avoid constructing a complete unpacked weight
+array or model-data string at once. The 3.1 context window is bounded for exactly
+this reason, and its peak document size on a device is unmeasured.
+
+8. GENERATED DATA SIZE AND PASTE LIMITS (PARTIALLY ADDRESSED)
+
+The original E40 tinydata.py is about 72 KB and may exceed the TI editor's single
+paste operation; it is preserved at source/legacy/tinydata_e40_single_file.py. The
+3.1 exporter splits exports into eight numbered installer programs of roughly 11 KB
+each, which should fit normal pastes. Whether that is still above the TI editor's
+limit on a given OS is unverified without hardware.
+
+9. TI PYTHON COMPATIBILITY
+
+TI Python is not full desktop CPython. Features that work on a Mac may fail on the
+calculator. One previous example was passing a tuple to str.startswith(). Keep new
+runtime code conservative and test it on physical hardware or the official
+preview. The 3.1 runtime changes were validated on desktop CPython against a
+simulated ti_system/ti_draw (33 passing tests); that simulation does not model
+TI-Python limits such as maximum expression size, deep recursion or available
+RAM. Two new runtime constructs are worth naming: inlined byte decoding inside the
+matrix loops (section 1.1 of MODIFICATIONS.txt) and Adler-32 checksum
+verification during install. Both are plain integer and list operations, but
+neither has run on a physical calculator.
+
+10. INPUT AND CLIPBOARD LIMITATIONS
+
+The ti_draw event loop cannot directly access the desktop clipboard. Tab therefore
+uses a Shell-based paste workflow. Key names may differ between the physical device
+and the official computer preview. The Shell paste-helper workflow was not
+re-exercised in 3.1.
+
+11. SAFETY FILTERS ARE BEST-EFFORT (UNCHANGED)
+
+The decoder blocks known profanity tokens and suppresses unrelated gendered terms,
+but a small vocabulary filter is not a complete content-safety system.
+
+12. NO GUARANTEED FACTS, MATH, OR INSTRUCTIONS (UNCHANGED)
+
+CalcGPT 3 has no hardcoded answer skills. All visible LM replies are generated.
+Consequently, requests for numbers, arithmetic, factual knowledge, or procedures
+are not guaranteed to be answered correctly.
+
+13. UNVERIFIED NEW CONTROLS
+
+Ctrl+N, Ctrl+R, Ctrl+T and Ctrl+L were implemented and unit-tested on the
+desktop. The physical key names TI Python reports for these combinations have not
+been confirmed, and ti_draw rendering of the new temperature readout in the status
+bar has not been seen. If a key does not register, that is a key-name issue, not a
+decoder issue.
+
+14. QUALITY METRICS ARE PROXIES
+
+The composite/relevance/repetition numbers in README.txt and MODIFICATIONS.txt
+come from lexical proxy metrics in tests/quality_metrics.py, not from human
+evaluation. They moved from 0.705 to 0.720 composite and 0.355 to 0.390 relevance
+on a fixed 14-prompt suite. Those deltas are small and within the range a human
+rater would treat as noise. They show that the 3.1 changes did not regress quality
+while roughly doubling speed; they do not show better understanding.
+
+15. NEW INSTALLER BEHAVIOUR TO BE AWARE OF
+
+The 3.1 installer is stricter than 1.0. A corrupt or truncated paste now fails its
+checksum immediately and names the offending unit instead of failing later with a
+generic "Corrupt model part" error. Each numbered part is idempotent, so re-running
+a completed part prints "already installed" and does nothing; to force a re-install,
+delete the "tdinfo" list first. Installing over a model with a different model id
+prompts for confirmation and cancels unless you answer y.
+
+16. THE 3.1 READY-TO-RUN DOCUMENT IS NOT YET CONFIRMED ON TI HARDWARE
+
+ready_to_run/CalcGPT3_v3.1.tns was produced by source/build_tns.py and verified
+structurally on the desktop: TI's encrypted Document.xml and Problem1.xml are
+byte-identical to the original document, the untouched installer page keeps its
+original compressed bytes, and the tinylm.py page embedded in the document was
+executed against the model variables stored inside that same document and produced
+replies identical to the exported runtime.
+
+What is NOT confirmed: that TI-Nspire Student Software opens the rebuilt container
+and that a physical calculator runs it. The build deliberately avoids decoding or
+re-encoding TI's method 13 compression, so the encrypted parts are untouched, but
+only TI's own software can give the final word. Open the document once in Student
+Software before distributing it.
+
+17. A NEW PYTHON PAGE CANNOT BE ADDED AUTOMATICALLY
+
+build_tns.py refuses to add a Python page to a .tns. A page only appears in the
+TI-Nspire interface if Problem1.xml contains a matching card, and that XML is
+TI-encrypted and cannot be edited safely. To add a page (for example the numbered
+tinydata2..tinydata8 installers), add the pages by hand in TI-Nspire Student
+Software as described in README.txt, then rebuild the document from that updated
+base.

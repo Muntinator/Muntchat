@@ -1,0 +1,9 @@
+{
+  "epochs": 40,
+  "vocab_size": 640,
+  "embedding": 20,
+  "hidden": 30,
+  "sequence": 36,
+  "batch": 96,
+  "format": 13
+}

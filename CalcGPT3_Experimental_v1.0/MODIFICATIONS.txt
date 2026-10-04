@@ -1,0 +1,391 @@
+CALCGPT 3 - MODIFICATIONS IN VERSION 3.1
+=======================================
+
+This file records every change made to the version-1.0 E40 release: what was
+changed, why, and what was measured. The model weights are unchanged. The
+on-calculator data format stays at 13 and the model id stays at 1282619148, so
+the existing ready-to-run TNS and every previously installed model keep working.
+
+Every number below comes from the desktop harness in source/tests/, which runs
+the real generated calculator code against a simulated ti_system/ti_draw on
+CPython 3.10. Recorded runs are kept in source/tests/results/.
+
+Baseline means the unmodified version-1.0 runtime and data, preserved in
+source/tests/baseline_snapshot/.
+
+-------------------------------------------------------------------------------
+1. CALCULATOR RUNTIME (source/calculator_template.py -> source/calculator/tinylm.py)
+-------------------------------------------------------------------------------
+
+1.1 Faster inference (about 2x)
+
+- The packed-byte decode was a separate per-element loop over three byte lists.
+  It is now inlined into the GRU and output-projection loops through a dot_row()
+  helper that decodes two values per list read instead of one.
+- prepare() now computes and caches the dequantized bias vectors BI_DQ, BH_DQ and
+  BO_DQ once per model load, instead of re-scaling them on every token.
+- Verification: the optimized step() and logits() were checked numerically
+  against the original implementation. Maximum absolute difference is about 1e-15,
+  i.e. identical to floating-point noise. This is asserted by the test suite.
+
+1.2 Smarter candidate selection
+
+- choose() takes a new seen3 parameter and applies exact three-token repetition
+  suppression, so a candidate cannot reproduce a trigram that already appeared in
+  the reply.
+- candidate_score() detects repeated trigrams while scoring, not only after the
+  whole candidate is generated.
+- acceptable() is an absolute quality gate: content words < 3, fewer than 2
+  distinct content words, or repetition above 40 percent. The second candidate is
+  generated only when the first fails this gate. The thresholds were tuned by
+  measurement (see section 5).
+
+1.3 Conversation context
+
+- New understand(prompt_ids, context_ids): the previous user turn's content words
+  feed association lookup and the dialogue-act/emotion classifiers at a reduced
+  weight (CONTEXT_WEIGHT = 0.5).
+- Bounds keep memory and latency in check: CONTEXT_LIMIT 16 tokens, PROMPT_LIMIT
+  18 tokens, BIGRAM_BASE 32768.
+- New previous_user_ids(messages) helper extracts the previous turn.
+- Short follow-ups such as "what about you" now resolve their content against the
+  earlier topic instead of in isolation.
+
+1.4 Generation defaults
+
+- Sampling temperatures TEMPS = (0.25, 0.42, 0.60, 0.80) and length multipliers
+  LENGTHS = (0.7, 1.0, 1.3) are now cyclable at runtime.
+
+1.5 UI and controls
+
+- New controls: Ctrl+N clears the conversation, Ctrl+R regenerates the last
+  reply, Ctrl+T cycles temperature, Ctrl+L cycles response length.
+- The status bar now displays the active temperature.
+- The help line shows "^N new  ^R redo  ^T temp".
+- respond(), regenerate(), clear_conversation(), cycle_temp() and cycle_length()
+  are defined before the state-initialisation line, so they are importable and
+  unit-testable instead of being defined inside the event-loop block.
+- VERSION is now "3.1".
+
+-------------------------------------------------------------------------------
+2. MODEL INSTALLER (source/export_calculator.py)
+-------------------------------------------------------------------------------
+
+2.1 Integrity
+
+- Every generated unit carries an Adler-32 checksum that is verified as the unit
+  is decoded on the calculator, and the read-back length is checked. A corrupt
+  paste now names the failing unit instead of surfacing later as an opaque
+  "Corrupt model part" error.
+- The final installer part re-reads and re-verifies every stored weight before
+  printing the success message.
+
+2.2 Resumability
+
+- Numbered parts are idempotent: re-running a part that already installed prints
+  "already installed" and stops, so an interrupted install can be resumed part by
+  part without starting over.
+
+2.3 Safety and hygiene
+
+- Installing over a model with a different model id asks for confirmation before
+  replacing it.
+- export() takes an output_dir parameter, so exports no longer write wherever the
+  process happens to be running.
+- model_meta.json is written next to the generated programs.
+- --checkpoint CLI argument selects which checkpoint to export.
+
+2.4 Bug fixes found while testing
+
+- verify() omitted the signed +128 byte offset when reading packed weights back,
+  which made every export fail its own verification with "Corrupt model part".
+  Fixed with (((packed >> 8) - 128) & 255).
+- A local variable named checks in export() shadowed the stage-check string and
+  produced a misleading error message. Renamed.
+- The exporter's generated part count and model id are unchanged: format 13,
+  build 2, model id 1282619148, 8 installer parts at FILE_BUDGET 11000.
+
+Backward compatibility of the generated runtime was verified directly: the new
+calculator/tinylm.py was run against the ORIGINAL version-1.0 single-file E40
+data (preserved at source/legacy/tinydata_e40_single_file.py) and produced a
+normal reply ('Yes, I think so.').
+
+-------------------------------------------------------------------------------
+3. TRAINING PIPELINE (source/train_mac.py)
+-------------------------------------------------------------------------------
+
+3.1 Validation
+
+- A held-out validation split (--validation-fraction, default 0.05) with
+  validation_loss() evaluation. Checkpoints now record train and validation token
+  counts and the validation loss.
+
+3.2 Reproducibility and control
+
+- --seed (default 2026) for reproducible runs.
+- --checkpoint to write somewhere other than the shipped E40 checkpoint, which
+  protects the released weights by default.
+- --data-dir for the corpus cache.
+- --limit-batches to cap batches per epoch for fast smoke tests.
+- --no-export to train without regenerating calculator programs.
+
+3.3 Smoke test
+
+- One epoch limited to five batches completed and reported
+  train loss 6.415 / val loss 6.339, then exported the smoke checkpoint to
+  tests/tmp/calc and generated a reply successfully. This confirms the trainer,
+  the exporter and the runtime agree end to end.
+
+macOS-only install_train_calc.py and train_calc are unchanged.
+
+-------------------------------------------------------------------------------
+4. TEST AND MEASUREMENT TOOLING (source/tests/, all new)
+-------------------------------------------------------------------------------
+
+- tisim.py: simulated ti_system and ti_draw modules (STORE, get_key, push_keys,
+  get_time_ms) so the real calculator code can run headlessly.
+- harness.py: loads installer parts, installs models into the simulated store,
+  and loads the runtime with a chosen seed. install_model() suppresses installer
+  prints; reset_store() is separate.
+- evaluate.py: before/after benchmark and quality run, writes a labelled JSON to
+  tests/results/.
+- quality_metrics.py: composite, relevance, repetition, OOV, complete-rate and
+  dangling-rate proxy metrics. Handles both the old one-argument and the new
+  two-argument understand() signature.
+- run_suite.py: runs the fixed 14-prompt SUITE against any build for comparison.
+- assoc_experiment.py: held-out retrieval experiment for association builders.
+- test_calcgpt3.py: 33 unit tests, all passing.
+- baseline_snapshot/: the original v1.0 tinylm.py and tinydata.py, kept for
+  before/after comparison.
+- source/.gitignore: ignores .venv/, .venv-test/, data/, tests/tmp/ and
+  tests/result*.json.
+
+Test coverage includes quantization round-trip, Adler-32, exporter compile and
+size, model-id stability (asserted equal to 1282619148), installer verification
+and resumability, partial installs, corrupted pastes, packed tensor, vocabulary,
+association, intent and emotion reconstruction, step/logits versus the reference
+implementation, the tokenizer, decoder edge cases (empty, very long, unknown
+words, punctuation, uppercase), conversation context, the control functions, the
+model-missing case, and the incomplete-install case.
+
+-------------------------------------------------------------------------------
+5. MEASUREMENTS
+-------------------------------------------------------------------------------
+
+5.1 Speed, desktop harness, per-call milliseconds
+
+  step                    1.580 -> 0.753   (2.10x)
+  logits                  6.545 -> 3.267   (2.00x)
+  choose                  1.087 -> 0.875   (1.24x)
+  generate (full reply) 233.1  -> 118.8    (1.96x)
+
+5.2 Quality, fixed 14-prompt suite, same seeds, proxy metrics
+
+                        baseline   final
+  composite              0.705      0.720
+  relevance              0.355      0.390
+  repetition (lower better) 0.202 0.189
+  complete_rate          1.000      1.000
+  dangling_rate          0.000      0.000
+
+These are desktop proxies, not a claim of semantic understanding.
+
+-------------------------------------------------------------------------------
+6. EXPERIMENTS THAT FAILED (measured, rejected, documented so they are not
+   re-tried blindly)
+-------------------------------------------------------------------------------
+
+6.1 Contrastive PMI / TF-IDF association builder
+
+  Scored on 7,513 held-out prompt/reply pairs.
+  Held-out top-3 retrieval 0.393 -> 0.112.  Much worse.  Rejected.
+
+6.2 Larger count-based association tables
+
+  Bigram feature tables up to 4,096 entries.
+  Held-out top-3 retrieval 0.393 -> 0.403, i.e. +0.010 for roughly 4x the
+  memory.  Not worth it on a calculator.  Rejected; the shipped
+  frequency-weighted scheme is retained deliberately.
+
+6.3 Always generate two candidates
+
+  Slower (1.61 s vs 1.02 s for the suite) and worse (composite 0.715 vs 0.744).
+  The adaptive quality gate won on both counts.
+
+6.4 Tightening the acceptable() thresholds
+
+  Raising the bar to min content 4, min distinct 3, and a 35-45 percent
+  repetition window made results worse (composite 0.720 vs 0.744).  Reverted to
+  content < 3, distinct < 2, repetition > 40 percent.
+
+6.5 Raising the intent/emotion item caps
+
+  Raising the 128-item caps to 256 changed the model id because the id is a
+  CRC-32 over the blobs plus the association, intent and emotion blobs.  The
+  change was reverted to keep backward compatibility.
+
+-------------------------------------------------------------------------------
+7. READY-TO-RUN DOCUMENT
+-------------------------------------------------------------------------------
+
+The original release shipped ready_to_run/CalcGPT3.tns containing the 1.0
+runtime. That document is preserved unchanged. A new document with the 3.1
+runtime embedded is built and committed alongside it.
+
+7.1 New tool: source/build_tns.py
+
+A .tns file is a ZIP container with two TI-specific quirks: the first local file
+header signature is "*TIMLP0900" instead of "PK\\x03\\x04", and the
+end-of-central-directory signature is "TIPD" instead of "PK\\x05\\x06". TI-Nspire
+Student Software stores the document XML (Document.xml, Problem1.xml) with a
+proprietary compression, "method 13": a 3DES-CTR transform, then raw deflate,
+then a tokenized XML form called TIXC. The Python program pages (tinylm.py,
+tinydata.py) are stored with ordinary deflate ("method 8") and are plain text.
+
+build_tns.py takes the surgical approach: it copies every method 13 entry
+byte-for-byte, including its original CRC and uncompressed size, and rewrites only
+the method 8 Python pages. TI's encrypted XML is never decoded or re-encoded.
+This was chosen deliberately over a decode/edit/re-encode round-trip, which would
+require reproducing TI's method 13 encryption exactly and could not be validated
+without a calculator or Student Software.
+
+For the same reason the tool refuses to add a new Python page. A page only appears
+in the TI-Nspire interface if Problem1.xml holds a matching card, and that XML
+cannot be edited safely. Replacing the content of an existing page is fine;
+adding a page is refused with an explanatory error rather than producing a
+document with an invisible page.
+
+Reusing the model's already-installed data is valid only because 3.1 keeps data
+format 13 and model id 1282619148. build_tns.py reads calculator/model_meta.json
+and refuses to build if either changes.
+
+7.2 New verifier: source/tests/verify_tns.py
+
+An end-to-end check rather than a structural one. It:
+
+  1. parses the built container;
+  2. decodes the TI method 13 Problem1.xml back to XML;
+  3. reconstructs the 120 model variables stored inside the document;
+  4. executes the tinylm.py page embedded in the document against exactly those
+     variables, via the simulated ti_system/ti_draw;
+  5. generates replies and confirms they match the freshly exported runtime
+     running on the same data.
+
+Step 4 is the point: it tests the page that ships inside the document, not the
+file in source/calculator, and it uses the document's own stored model rather
+than a freshly installed one. A document that passed every unit test could still
+be broken at this step.
+
+The method 13 and TIXC decoders are vendored under source/tests/ti_tns/ from the
+MIT-licensed TnsTools project (github.com/MaksimirKurtov/TnsTools), with its
+LICENSE and provenance in that directory. Only the decoder is used; CalcGPT 3
+never re-encodes method 13 payloads.
+
+7.3 New tests: source/tests/test_tns.py
+
+18 tests covering the container format, the builder's guards, the built document,
+and build reproducibility. Notable ones:
+
+- the TI-encrypted entries in the built document are byte-identical to the base
+  document, with unchanged CRC and size;
+- only tinylm.py differs; the untouched tinydata.py keeps its original compressed
+  bytes;
+- the embedded page is byte-identical to source/calculator/tinylm.py;
+- every variable the 3.1 runtime needs is present in the document;
+- the document's decoded model data equals what the 3.1 installers produce, value
+  for value;
+- the document's page generates replies identical to the exported runtime;
+- entries tile the file with no gaps before the central directory;
+- two builds from the same inputs are byte-identical, and the committed .tns
+  matches a fresh build;
+- the builder refuses to add a page and refuses a mismatched model_meta.json.
+
+7.4 Bugs found while building and verifying this
+
+- The builder's central-directory parse loop never set its success flag when the
+  loop completed without a break, so every parse failed. Found because the build
+  failed immediately rather than silently.
+- rebuild() was re-deflating pages that had not been modified, so tinydata.py
+  changed from 53,057 to 52,960 bytes purely because of a different compression
+  level. Now untouched pages reuse their original compressed bytes, so the built
+  document differs from the base only where it must.
+- The empty-page deflate path produced a stream raw-inflate rejected.
+- The TIXC text decoder writes U+2212 (a Unicode minus) for negative numbers. A
+  naive parser produces NaN for every negative weight, which silently corrupts the
+  whole model. Caught by comparing decoded values against a real installation.
+
+7.5 Measured result
+
+  ready_to_run/CalcGPT3.tns        176,911 bytes  (4 entries, unchanged)
+  ready_to_run/CalcGPT3_v3.1.tns   179,094 bytes  (+1.2%, tinylm.py only)
+
+Verified: Document.xml and Problem1.xml byte-identical to the base document and
+decode to byte-identical XML; tinydata.py compressed bytes identical; tinylm.py
+runs on the document's stored model and matches the exported runtime exactly.
+
+-------------------------------------------------------------------------------
+8. DOCUMENTATION
+-------------------------------------------------------------------------------
+
+- README.txt rewritten for version 3.1: new features, controls, build and
+  install steps, the desktop test commands, the measurements table, the verified
+  negative result, the source layout, the ready-to-run document build and verify
+  steps, and the list of items that cannot be verified without hardware.
+- CHANGELOG.txt gained a Version 3.1 entry.
+- IMPROVEMENT_ROADMAP.txt marks what is now done and what remains open.
+- KNOWN_ISSUES.txt updated: latency expectations, the new installer guarantees,
+  the new context handling, and the unchanged core limitation.
+- CONTRIBUTING.md now expects the desktop suite to be run and its results
+  reported.
+- ARCHIVE_SUBMISSION.txt updated to 3.1 wording.
+- This file (MODIFICATIONS.txt).
+
+-------------------------------------------------------------------------------
+9. NOT VERIFIED - REQUIRES TI-NSPIRE HARDWARE OR THE OFFICIAL PREVIEW
+-------------------------------------------------------------------------------
+
+None of the following were exercised, and no claim is made about them:
+
+- Absolute on-device launch, model-load and per-response timings. The desktop
+  speedups are CPU-level measurements, not seconds on a calculator.
+- Peak document size and MemoryError behaviour with the 3.1 loader.
+- The physical key names for Ctrl+N, Ctrl+R, Ctrl+T and Ctrl+L.
+- ti_draw rendering of the new status bar, the temperature readout and wrapped
+  messages.
+- The Shell paste-helper workflow.
+- The TI editor's single-paste size limit for the generated parts.
+- Whether TI-Nspire Student Software opens CalcGPT3_v3.1.tns, and whether a
+  physical calculator runs it. The document is structurally valid and its
+  embedded runtime was executed against its own stored model data, but it has
+  never been opened by TI's own software. This is the main remaining risk in the
+  3.1 release.
+
+-------------------------------------------------------------------------------
+10. QUICK COMMAND REFERENCE
+-------------------------------------------------------------------------------
+
+Regenerate the shipped artifacts (macOS trainer, or any Python with torch):
+
+  python3 export_calculator.py --checkpoint checkpoints/calcgpt3.pt
+
+Rebuild and verify the ready-to-run document:
+
+  python3 build_tns.py --base ../ready_to_run/CalcGPT3.tns \
+      --out ../ready_to_run/CalcGPT3_v3.1.tns \
+      --runtime calculator/tinylm.py --meta calculator/model_meta.json
+
+  .venv-test/bin/python tests/verify_tns.py ../ready_to_run/CalcGPT3_v3.1.tns
+
+Run the full test suite:
+
+  cd source
+  .venv-test/bin/python -m unittest discover -s tests
+
+Benchmark and score the current build against the 1.0 baseline:
+
+  .venv-test/bin/python tests/evaluate.py --label current
+
+Compare any build on the same prompts and seeds:
+
+  .venv-test/bin/python tests/run_suite.py --template PATH/tinylm.py \
+      --data PATH/tinydata*.py --label build

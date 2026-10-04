@@ -1,0 +1,32 @@
+MODEL AND DATASET ATTRIBUTION
+=============================
+
+The included CalcGPT 3 checkpoint and ready-to-run model were trained using the
+DailyDialog dataset.
+
+DailyDialog citation:
+
+Yanran Li, Hui Su, Xiaoyu Shen, Wenjie Li, Ziqiang Cao, and Shuzi Niu.
+"DailyDialog: A Manually Labelled Multi-turn Dialogue Dataset."
+Proceedings of IJCNLP 2017.
+https://arxiv.org/abs/1710.03957
+
+Dataset distribution referenced by the trainer:
+https://huggingface.co/datasets/roskoN/dailydialog
+
+DailyDialog is distributed under the Creative Commons
+Attribution-NonCommercial-ShareAlike 4.0 International license
+(CC BY-NC-SA 4.0). To conservatively follow those terms, the included trained
+checkpoint and model-containing TNS are also distributed for noncommercial use
+with attribution and share-alike requirements under CC BY-NC-SA 4.0.
+
+License text:
+https://creativecommons.org/licenses/by-nc-sa/4.0/legalcode
+
+The MIT License in LICENSE_CODE.txt applies to original project source code, not
+to DailyDialog or third-party dataset content. Users who retrain on another corpus
+are responsible for complying with that corpus's license.
+
+No warranty is provided. Generated text may be incorrect, incoherent, offensive,
+or otherwise unsuitable. Do not use the model for consequential decisions.
+

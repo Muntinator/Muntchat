@@ -1,0 +1,100 @@
+{
+  "label": "baseline",
+  "benchmark": {
+    "step_ms": 1.5802369999846633,
+    "logits_ms": 6.544963000010284,
+    "choose_ms": 1.086886999928538,
+    "generate_ms": 233.13395500008482,
+    "config": {
+      "E": 20,
+      "H": 30,
+      "N": 640
+    }
+  },
+  "quality": [
+    {
+      "name": "greeting",
+      "prompt": "hello",
+      "reply": "Yes, I think you can take a look at the first time. I.",
+      "seconds": 0.2658
+    },
+    {
+      "name": "greeting2",
+      "prompt": "good morning",
+      "reply": "Good morning. Good morning, it is good.",
+      "seconds": 0.1891
+    },
+    {
+      "name": "question",
+      "prompt": "what is your name",
+      "reply": "My name my name is my first in my country.",
+      "seconds": 0.2007
+    },
+    {
+      "name": "howareyou",
+      "prompt": "how are you",
+      "reply": "I have to buy a table for you.",
+      "seconds": 0.1898
+    },
+    {
+      "name": "feeling",
+      "prompt": "i am feeling sad today",
+      "reply": "It have it that it is that it's a good idea.",
+      "seconds": 0.2856
+    },
+    {
+      "name": "weather",
+      "prompt": "the weather is nice today",
+      "reply": "It like it. It was it like it.",
+      "seconds": 0.1867
+    },
+    {
+      "name": "thanks",
+      "prompt": "thank you very much",
+      "reply": "It it is it for it. It seems it was a little bit than the same day.",
+      "seconds": 0.2834
+    },
+    {
+      "name": "request",
+      "prompt": "can you help me please",
+      "reply": "It's not what it is. It looks like you can find a little bit than.",
+      "seconds": 0.2824
+    },
+    {
+      "name": "unknown",
+      "prompt": "quantum entanglement explained",
+      "reply": "I think we can have a lot of money.",
+      "seconds": 0.1862
+    },
+    {
+      "name": "empty",
+      "prompt": "",
+      "reply": "What do you mean?",
+      "seconds": 0.1017
+    },
+    {
+      "name": "punct",
+      "prompt": "really?!?! that is amazing!!!",
+      "reply": "It's that the problem is a good idea.",
+      "seconds": 0.1963
+    },
+    {
+      "name": "caps",
+      "prompt": "I AM VERY ANGRY RIGHT NOW",
+      "reply": "It have it that it have it that it that it is. Have you ever seen.",
+      "seconds": 0.3429
+    },
+    {
+      "name": "math",
+      "prompt": "what is two plus two",
+      "reply": "It's my pleasure. It will be more than my friend.",
+      "seconds": 0.2093
+    },
+    {
+      "name": "followup",
+      "prompt": "what about germany",
+      "reply": "It's the best problem.",
+      "seconds": 0.1255
+    }
+  ]
+}

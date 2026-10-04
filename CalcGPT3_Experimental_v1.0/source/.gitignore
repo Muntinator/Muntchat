@@ -1,0 +1,10 @@
+# Local training / test environment
+.venv/
+.venv-test/
+__pycache__/
+*.pyc
+# Downloaded corpus cache
+data/
+# Test scratch output
+tests/tmp/
+tests/result*.json

@@ -1,0 +1,53 @@
+SUGGESTED ARCHIVE SUBMISSION INFORMATION
+========================================
+
+Title:
+CalcGPT 3 - Experimental Offline Neural Language Model
+
+Version:
+3.1 (E40 weights, improved runtime and tooling)
+
+Author:
+Fred Bennett
+
+Platform/category:
+TI-Nspire CX II / Python Programs
+
+Short description:
+An experimental 8-bit quantized GRU language model that generates text entirely
+in standard TI-Nspire Python without Ndless, internet access, or an API.
+
+Full description:
+CalcGPT 3 is an open experimental neural language model for the TI-Nspire CX II.
+The Mac trainer builds a 640-token, 30-state word-level GRU from DailyDialog and
+exports signed 8-bit weights for a dependency-free TI Python inference engine.
+The calculator interface includes wrapped chat, scrolling, input controls,
+dialogue-act and emotion conditioning, ordered prompt associations, and ranked
+two-candidate generation. A ready-to-run E40 TNS, resumable checkpoint, trainer,
+exporter, calculator source, screenshots, documentation, known issues, and an
+improvement roadmap are included.
+
+Version 3.1 keeps the E40 weights, the version-13 data format and the model id
+unchanged, so existing installs keep working, and improves everything around them:
+roughly 2x faster inference, three-token repetition suppression with an adaptive
+second candidate, bounded rolling conversation context, Ctrl+N/R/T/L controls,
+checksum-verified and resumable numbered installers, a held-out validation split
+in the trainer, and a rebuilt ready-to-run .tns produced by a tool that patches
+only the plain-text pages and copies TI's encrypted document XML byte-for-byte.
+A 51-test desktop suite runs the real calculator code against a simulated
+ti_system/ti_draw, including an end-to-end check that executes the runtime page
+embedded in the built document against the model data stored inside that document.
+Recorded measurements and a full change list are in MODIFICATIONS.txt.
+
+This is a research demonstration, not a reliable assistant: responses often lack
+semantic understanding, and the quality metrics are lexical proxies rather than
+human evaluation. No Ndless is required. On-device timings, peak document size,
+the new key bindings and the paste workflow were not re-measured, as no hardware
+was available, and the rebuilt .tns has not yet been opened in TI-Nspire Student
+Software; see KNOWN_ISSUES.txt.
+
+Suggested archive filename:
+calcgpt3_experimental_v3.1.zip
+
+Suggested Cemetech topic title:
+CalcGPT 3: An Offline Neural Language Model Running in Stock TI-Nspire Python

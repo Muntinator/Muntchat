@@ -1,0 +1,105 @@
+CALCGPT 3 CHANGELOG
+===================
+
+Version 3.1 - runtime, decoder, installer and tooling revision - 2026-10-04
+
+The model weights are unchanged from 1.0 (E40). The on-calculator data format
+stays at 13 and the model id stays at 1282619148, so the ready-to-run TNS and
+previously installed models keep working.
+
+Runtime:
+- Inlined the packed-byte decode into the GRU and output-projection loops and
+  cached the dequantized bias vectors. About 2x faster per generated token
+  (generate 233.1 -> 118.8 ms on the desktop harness); the optimized math is
+  verified numerically identical to the original.
+- Added exact three-token repetition suppression and a running frequency penalty
+  to candidate generation, and a quality gate that only spends a second candidate
+  when the first reply actually fails.
+- Added a compact rolling conversation context so short follow-ups carry the
+  previous turn's content words into association lookup and act/emotion
+  conditioning at reduced weight.
+- Added Ctrl+N (clear), Ctrl+R (regenerate), Ctrl+T (temperature) and Ctrl+L
+  (response length), plus a temperature readout in the status bar.
+- Moved the control functions above the state-initialisation line so they are
+  testable; bumped VERSION to 3.1.
+
+Installer (exporter):
+- Every generated unit now carries an Adler-32 checksum, verified as it is
+  decoded, with read-back length checks and a full re-verify of all stored weights
+  in the final part.
+- Numbered parts are idempotent, so an interrupted install can be resumed part by
+  part.
+- Installing over a different model id now asks for confirmation.
+- export() takes an output_dir, writes model_meta.json, and gained a
+  --checkpoint argument.
+- Fixed verify(), which omitted the signed +128 byte offset and made every export
+  fail its own verification; fixed a local variable that shadowed the stage
+  check string.
+
+Training:
+- Added a held-out validation split with validation loss reporting, deterministic
+  seeding, and --checkpoint / --data-dir / --limit-batches / --no-export options.
+- Checkpoints now record validation loss and train/validation token counts.
+
+Ready-to-run document:
+- Added source/build_tns.py, which rebuilds a .tns problem by replacing only the
+  plain-text Python pages and copying TI's encrypted document XML byte-for-byte,
+  preserving its original checksums. Decoding and re-encoding TI's method 13
+  compression is deliberately avoided because it cannot be validated without
+  TI-Nspire Student Software or hardware.
+- The builder refuses to add a new Python page, since a page only appears in the
+  interface if the encrypted Problem1.xml holds a matching card.
+- Added source/tests/verify_tns.py, which decodes the built document, recovers the
+  model variables stored inside it, and runs the tinylm.py page that the document
+  itself ships against that data, confirming it matches the exported runtime.
+- Added source/tests/test_tns.py (18 tests). The suite is now 51 tests, all
+  passing.
+- Added ready_to_run/CalcGPT3_v3.1.tns (179,094 bytes). The original
+  ready_to_run/CalcGPT3.tns is unchanged and is the base document.
+- Vendored the MIT-licensed TnsTools method 13 / TIXC decoder under
+  source/tests/ti_tns/ for verification use only; CalcGPT 3 never re-encodes
+  method 13 payloads.
+
+Tooling (new):
+- Added a simulated ti_system/ti_draw so the real calculator code runs headlessly.
+- Added a benchmark and quality harness, a fixed 14-prompt suite, a quality
+  metrics module, an association experiment, and a unittest suite. All 51 tests
+  pass.
+
+Documentation:
+- README.txt rewritten for 3.1.
+- Added MODIFICATIONS.txt with the complete change list and measurements.
+- Updated IMPROVEMENT_ROADMAP.txt, KNOWN_ISSUES.txt, CONTRIBUTING.md and
+  ARCHIVE_SUBMISSION.txt.
+
+Still open: the model still lacks reliable semantic understanding. Lower
+training loss does not fix this, and none of the 3.1 changes alter the weights.
+A contrastive PMI/TF-IDF association builder, larger association tables, always
+generating two candidates, and stricter candidate gates were all implemented,
+measured, and rejected; see MODIFICATIONS.txt section 6.
+
+Not verified without a TI-Nspire CX II or the official preview: on-device
+timings, peak document size and MemoryError behaviour, the physical key names for
+the new controls, ti_draw rendering of the status bar, the Shell paste-helper
+workflow, and the TI editor paste-size limit. CalcGPT3_v3.1.tns has also never been
+opened in TI-Nspire Student Software: it is structurally valid and its embedded
+runtime was executed against its own stored model data on the desktop, but
+confirming that TI's software accepts the rebuilt container is still outstanding.
+
+Version 1.0 - E40 research release - 2026-07-18
+
+- Published ready-to-run TI-Nspire problem and resumable E40 checkpoint.
+- Runs a quantized word-level GRU entirely in standard TI Python.
+- Added white app-style interface, shaded user messages, wrapped input/output,
+  scrolling, capitalization, punctuation keys, paste helper, and response copying.
+- Added dialogue-act and emotion conditioning using DailyDialog annotations.
+- Preserved uppercase, repeated punctuation, and hesitation signals.
+- Added ordered prompt bigram associations.
+- Added two-candidate generation and relevance/grammar ranking.
+- Added repetition, profanity, unrelated gender-term, and incomplete-ending filters.
+- Fixed TI-incompatible tuple use in str.startswith().
+- Fixed prior contiguous model-loading MemoryError with chunked packed lists.
+- Updated exporter to create numbered paste-safe tinydata installers.
+- Documented response-quality failures and the distinction between generation and
+  semantic understanding.
+

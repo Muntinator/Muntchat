@@ -1,0 +1,39 @@
+CALCGPT 3 BUG REPORT
+====================
+
+Short title:
+
+Release/version:
+Checkpoint epoch:
+Model ID shown/stored (if known):
+
+Calculator model:
+Calculator OS version:
+Physical calculator or official preview:
+
+What you expected:
+
+What happened:
+
+Exact steps to reproduce:
+1.
+2.
+3.
+
+Exact prompt:
+
+Exact generated response:
+
+Complete traceback, if any:
+
+Ctrl+R to interface time:
+First model-load time:
+Response-generation time:
+
+Does it happen after restarting the document?
+Does it happen with the supplied E40 TNS?
+
+Files modified from the release:
+
+Additional notes or screenshots:
+
